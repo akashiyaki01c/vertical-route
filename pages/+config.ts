@@ -6,8 +6,7 @@ import vikeReact from "vike-react/config";
 
 export default {
   // https://vike.dev/head-tags
-  title: "My Vike App",
-  description: "Demo showcasing Vike",
+  title: "縦断面図生成器",
 
   extends: vikeReact,
 } satisfies Config;
