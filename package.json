@@ -5,17 +5,17 @@
     "preview": "vike preview"
   },
   "dependencies": {
-    "vike": "^0.4.239",
+    "@tailwindcss/vite": "^4.1.13",
     "@vitejs/plugin-react": "^5.0.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.13",
+    "vike": "^0.4.239",
     "vike-react": "^0.6.5"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "vite": "^7.1.4",
     "@types/react": "^19.1.12",
-    "@types/react-dom": "^19.1.9"
+    "typescript": "^5.9.2"
   },
   "type": "module"
 }
