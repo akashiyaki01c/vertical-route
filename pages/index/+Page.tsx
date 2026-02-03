@@ -3,10 +3,7 @@ import { Terrain } from "./terrain";
 import { Gradient } from "./gradient";
 import { Station } from "./station";
 import "./index.css";
-
-const roundUpMultiple = (value: number, multiple: number) => {
-  return Math.ceil(value / multiple) * multiple;
-};
+import { Structure, StructureType } from "./structure";
 
 export default function Page() {
   const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -34,9 +31,15 @@ export default function Page() {
     new Gradient(600, 0),
   ] as Gradient[]);
   const [stations, setStations] = useState([] as Station[]);
+  const [structures, setStructures] = useState([] as Structure[]);
 
   const [newGradientDistance, setNewGradientDistance] = useState(0);
   const [newGradientValue, setNewGradientValue] = useState(0);
+
+  const [newStructureStartDistance, setNewStructureStartDistance] = useState(0);
+  const [newStructureEndDistance, setNewStructureEndDistance] = useState(0);
+  const [newStructureType, setNewStructureType] = useState("tunnel");
+  const [newStructureName, setNewStructureName] = useState("");
 
   const firstDistance = verticalTerrain[0]?.distance - 100;
   const lastDistance =
@@ -49,8 +52,6 @@ export default function Page() {
       .reduce((max, current) => Math.max(max, current), -Infinity) + 20;
   const minHeight = 0;
   const minHeightPadding = 20;
-
-  console.log(firstDistance, lastDistance, maxHeight, minHeight);
 
   const components = [];
   {
@@ -71,7 +72,7 @@ export default function Page() {
                 fill="gray"
               >
                 {j}
-              </text>
+              </text>,
             );
           }
         }
@@ -85,7 +86,7 @@ export default function Page() {
             x2={(i - firstDistance) * xScale}
             strokeWidth={2}
             stroke="#777"
-          />
+          />,
         );
       }
       if (i % 100 === 0) {
@@ -97,12 +98,12 @@ export default function Page() {
             x2={(i - firstDistance) * xScale}
             strokeWidth={0.5}
             stroke="#000"
-          />
+          />,
         );
         components.push(
           <text x={(i - firstDistance) * xScale} y={20} textAnchor="middle">
             {i}
-          </text>
+          </text>,
         );
         components.push(
           <text
@@ -111,7 +112,7 @@ export default function Page() {
             textAnchor="middle"
           >
             {i}
-          </text>
+          </text>,
         );
       }
       if (i % 50 === 0) {
@@ -124,7 +125,7 @@ export default function Page() {
             strokeWidth={0.5}
             stroke="#000"
             strokeDasharray="2 2"
-          />
+          />,
         );
       }
     }
@@ -145,7 +146,7 @@ export default function Page() {
             x2={(lastDistance - firstDistance) * xScale}
             strokeWidth={0.5}
             stroke="#000"
-          />
+          />,
         );
       }
       if (i % 5 === 0) {
@@ -158,7 +159,7 @@ export default function Page() {
             strokeWidth={0.5}
             stroke="#000"
             strokeDasharray="2 2"
-          />
+          />,
         );
       }
     }
@@ -171,7 +172,7 @@ export default function Page() {
       points.push(
         `${(verticalTerrain[i].distance - firstDistance) * xScale},${
           (maxHeight - verticalTerrain[i].z - minHeight) * yScale
-        }`
+        }`,
       );
     }
     components.push(
@@ -180,7 +181,7 @@ export default function Page() {
         stroke="blue"
         fill="none"
         strokeWidth={2}
-      />
+      />,
     );
   }
   {
@@ -194,17 +195,12 @@ export default function Page() {
       const beforeLength =
         (localGradients[i]?.distance || 0) -
         (localGradients[i - 1]?.distance || 0);
-      console.log(
-        i,
-        nowHeight,
-        nowHeight + (beforeLength / 1000) * localGradients[i].gradientValue
-      );
       nowHeight +=
         (beforeLength / 1000) * (localGradients[i - 1]?.gradientValue || 0);
       points.push(
         `${(localGradients[i].distance - firstDistance) * xScale} ${
           (maxHeight - minHeight - nowHeight) * yScale
-        }`
+        }`,
       );
     }
     {
@@ -217,7 +213,7 @@ export default function Page() {
       points.push(
         `${(lastDistance - firstDistance) * xScale} ${
           (maxHeight - minHeight - nowHeight) * yScale
-        }`
+        }`,
       );
     }
     components.push(
@@ -226,7 +222,7 @@ export default function Page() {
         stroke="red"
         fill="none"
         strokeWidth={2}
-      />
+      />,
     );
     components.push(
       <polyline
@@ -235,7 +231,7 @@ export default function Page() {
         fill="none"
         strokeWidth={1}
         style={{ transform: `translate(0, -${4 * yScale}px)` }}
-      />
+      />,
     );
   }
   {
@@ -249,7 +245,7 @@ export default function Page() {
           y2={(maxHeight - minHeight) * yScale}
           stroke="green"
           strokeWidth={4}
-        />
+        />,
       );
       components.push(
         <text
@@ -258,7 +254,79 @@ export default function Page() {
           textAnchor="middle"
         >
           {sta.name}
-        </text>
+        </text>,
+      );
+    }
+  }
+  {
+    // トンネル･橋梁
+    function getEveration(distance: number): {
+      everation: number;
+      gradient: number;
+    } {
+      if (distance >= lastDistance) {
+        return { everation: 0, gradient: 0 };
+      }
+
+      let everation = startHeight;
+      let gradient = 0;
+      for (let i = 0; i < distance; i++) {
+        everation += gradient / 1000;
+
+        const gradientChange = gradients.find((v) => v.distance === i);
+        if (gradientChange) {
+          gradient = gradientChange.gradientValue;
+        }
+      }
+
+      return { everation, gradient };
+    }
+
+    for (const structure of structures) {
+      const points = [];
+      const everation = getEveration(structure.startDistance);
+      let nowHeight = everation.everation;
+      let nowGradient = everation.gradient;
+      let beforeDistance = structure.startDistance;
+      for (let i = structure.startDistance; i < structure.endDistance; i++) {
+        nowHeight += (1 / 1000) * (nowGradient || 0);
+        points.push(
+          `${(i - firstDistance) * xScale} ${
+            (maxHeight - minHeight - nowHeight) * yScale
+          }`,
+        );
+
+        const gradientChange = gradients.find((v) => v.distance === i);
+        if (gradientChange) {
+          nowGradient = gradientChange.gradientValue;
+          console.log(nowGradient);
+        }
+      }
+      components.push(
+        <text
+          x={`${((structure.startDistance + structure.endDistance) / 2 - firstDistance) * xScale}`}
+          y={`${(maxHeight - minHeight - nowHeight + 10) * yScale}`}
+          textAnchor="middle"
+        >
+          {structure.name}
+        </text>,
+      );
+      components.push(
+        <polyline
+          points={points.join(" ")}
+          className={`structure-${structure.type}`}
+          fill="none"
+          strokeWidth={6}
+        />,
+      );
+      components.push(
+        <polyline
+          points={points.join(" ")}
+          className={`structure-${structure.type}`}
+          fill="none"
+          strokeWidth={6}
+          style={{ transform: `translate(0, -${4 * yScale}px)` }}
+        />,
       );
     }
   }
@@ -295,8 +363,8 @@ export default function Page() {
                       Number.parseInt(row[0]),
                       Number.parseFloat(row[1]),
                       Number.parseFloat(row[2]),
-                      Number.parseFloat(row[3])
-                    )
+                      Number.parseFloat(row[3]),
+                    ),
                   );
                 }
                 setVerticalTerrain(result);
@@ -310,19 +378,52 @@ export default function Page() {
                 gradients.map((v) => ({
                   position: v.distance,
                   value: v.gradientValue,
-                }))
+                })),
               )}
               onChange={(event) => {
                 try {
                   const json = JSON.parse(event.target.value);
                   if (Array.isArray(json)) {
                     const arr = json as any[];
-                    const gradients = arr.map(v => new Gradient(Number.parseInt(v.distance), Number.parseFloat(v.value)));
+                    const gradients = arr.map((v) => {
+                      return new Gradient(
+                        Number.parseInt(v.position),
+                        Number.parseFloat(v.value),
+                      );
+                    });
                     setGradients(gradients);
                   }
-                } catch (error) {
-                  
-                }
+                } catch (error) {}
+              }}
+            ></textarea>
+          </div>
+          <div>
+            <div>構造物出力</div>
+            <textarea
+              value={JSON.stringify(
+                structures.map((v) => ({
+                  start: v.startDistance,
+                  end: v.endDistance,
+                  type: v.type,
+                  name: v.name,
+                })),
+              )}
+              onChange={(event) => {
+                try {
+                  const json = JSON.parse(event.target.value);
+                  if (Array.isArray(json)) {
+                    const arr = json as any[];
+                    const structures = arr.map((v) => {
+                      return new Structure(
+                        Number.parseInt(v.start),
+                        Number.parseInt(v.end),
+                        v.type,
+                        v.name,
+                      );
+                    });
+                    setStructures(structures);
+                  }
+                } catch (error) {}
               }}
             ></textarea>
           </div>
@@ -364,7 +465,7 @@ export default function Page() {
                     onChange={(event) => {
                       const newGradients = [...gradients];
                       gradients[i].distance = Number.parseFloat(
-                        event.target.value
+                        event.target.value,
                       );
                       setGradients(newGradients);
                     }}
@@ -380,7 +481,7 @@ export default function Page() {
                     onChange={(event) => {
                       const newGradients = [...gradients];
                       gradients[i].gradientValue = Number.parseFloat(
-                        event.target.value
+                        event.target.value,
                       );
                       setGradients(newGradients);
                     }}
@@ -431,6 +532,150 @@ export default function Page() {
               ]);
               setNewGradientDistance(0);
               setNewGradientValue(0);
+            }}
+          >
+            追加
+          </button>
+        </div>
+
+        {structures.map((v, i) => {
+          return (
+            <>
+              <div style={{ display: "flex", gap: "0.5em" }}>
+                <label>
+                  開始
+                  <input
+                    type="number"
+                    value={v.startDistance}
+                    style={{ width: "4em" }}
+                    onChange={(event) => {
+                      const newStructures = [...structures];
+                      newStructures[i].startDistance = Number.parseFloat(
+                        event.target.value,
+                      );
+                      setStructures(newStructures);
+                    }}
+                  />
+                  m
+                </label>
+                <label>
+                  終了
+                  <input
+                    type="number"
+                    value={v.endDistance}
+                    style={{ width: "4em" }}
+                    onChange={(event) => {
+                      const newStructures = [...structures];
+                      newStructures[i].endDistance = Number.parseFloat(
+                        event.target.value,
+                      );
+                      setStructures(newStructures);
+                    }}
+                  />
+                  m
+                </label>
+                <label>
+                  名称
+                  <input
+                    type="text"
+                    value={v.name}
+                    style={{ width: "6em" }}
+                    onChange={(event) => {
+                      const newStructures = [...structures];
+                      newStructures[i].name = event.target.value;
+                      setStructures(newStructures);
+                    }}
+                  />
+                </label>
+                <label>
+                  <select
+                    value={v.type}
+                    onChange={(event) => {
+                      const newStructures = [...structures];
+                      newStructures[i].type = event.target
+                        .value as StructureType;
+                      setStructures(newStructures);
+                    }}
+                  >
+                    <option value="tunnel">トンネル</option>
+                    <option value="bridge">橋梁</option>
+                  </select>
+                </label>
+                <button
+                  onClick={() => {
+                    setStructures(structures.filter((_, j) => j !== i));
+                  }}
+                >
+                  削除
+                </button>
+              </div>
+            </>
+          );
+        })}
+        <div style={{ display: "flex", gap: "0.5em", marginTop: "1em" }}>
+          <label>
+            開始
+            <input
+              type="number"
+              value={newStructureStartDistance}
+              style={{ width: "4em" }}
+              onChange={(event) => {
+                setNewStructureStartDistance(
+                  Number.parseFloat(event.target.value),
+                );
+              }}
+            />
+            m
+          </label>
+          <label>
+            終了
+            <input
+              type="number"
+              value={newStructureEndDistance}
+              style={{ width: "4em" }}
+              onChange={(event) => {
+                setNewStructureEndDistance(
+                  Number.parseFloat(event.target.value),
+                );
+              }}
+            />
+            m
+          </label>
+          <label>
+            名称
+            <input
+              type="text"
+              value={newStructureName}
+              style={{ width: "6em" }}
+              onChange={(event) => {
+                setNewStructureName(event.target.value);
+              }}
+            />
+          </label>
+          <label>
+            <select
+              value={newStructureType}
+              onChange={(event) => {
+                setNewStructureType(event.target.value);
+              }}
+            >
+              <option value="tunnel">トンネル</option>
+              <option value="bridge">橋梁</option>
+            </select>
+          </label>
+          <button
+            onClick={() => {
+              setStructures([
+                ...structures,
+                new Structure(
+                  newStructureStartDistance,
+                  newStructureEndDistance,
+                  newStructureType as StructureType,
+                  newStructureName,
+                ),
+              ]);
+              setNewStructureStartDistance(0);
+              setNewStructureEndDistance(0);
             }}
           >
             追加
