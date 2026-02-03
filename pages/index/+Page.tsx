@@ -9,10 +9,12 @@ const roundUpMultiple = (value: number, multiple: number) => {
 };
 
 export default function Page() {
-  const handleBeforeUnload = () => {
-    if (confirm("ページを離れても良いですか？")) {
-      return true;
-    }
+  const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const message =
+      "入力内容が保存されない可能性があります。ページを離れますか？";
+    e.preventDefault();
+    e.returnValue = message;
+    return message;
   };
   useEffect(() => {
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -45,10 +47,7 @@ export default function Page() {
       .filter((v) => Number.isFinite(v.z))
       .map((v) => v.z)
       .reduce((max, current) => Math.max(max, current), -Infinity) + 20;
-  const minHeight = verticalTerrain
-    .filter((v) => Number.isFinite(v.z))
-    .map((v) => v.z)
-    .reduce((max, current) => Math.min(max, current), Infinity);
+  const minHeight = 0;
   const minHeightPadding = 20;
 
   console.log(firstDistance, lastDistance, maxHeight, minHeight);
@@ -115,7 +114,7 @@ export default function Page() {
           </text>
         );
       }
-      if (i % 20 === 0) {
+      if (i % 50 === 0) {
         components.push(
           <line
             y1={0}
@@ -149,7 +148,7 @@ export default function Page() {
           />
         );
       }
-      if (i % 2 === 0) {
+      if (i % 5 === 0) {
         components.push(
           <line
             y1={(maxHeight - minHeight - i) * yScale}
@@ -309,10 +308,22 @@ export default function Page() {
             <textarea
               value={JSON.stringify(
                 gradients.map((v) => ({
-                  distance: v.distance,
+                  position: v.distance,
                   value: v.gradientValue,
                 }))
               )}
+              onChange={(event) => {
+                try {
+                  const json = JSON.parse(event.target.value);
+                  if (Array.isArray(json)) {
+                    const arr = json as any[];
+                    const gradients = arr.map(v => new Gradient(Number.parseInt(v.distance), Number.parseFloat(v.value)));
+                    setGradients(gradients);
+                  }
+                } catch (error) {
+                  
+                }
+              }}
             ></textarea>
           </div>
           <div>
