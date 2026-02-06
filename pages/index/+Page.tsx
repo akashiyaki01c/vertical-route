@@ -387,7 +387,7 @@ export default function Page() {
                     const arr = json as any[];
                     const gradients = arr.map((v) => {
                       return new Gradient(
-                        Number.parseInt(v.position),
+                        Number.parseInt(v.position || v.distance),
                         Number.parseFloat(v.value),
                       );
                     });
